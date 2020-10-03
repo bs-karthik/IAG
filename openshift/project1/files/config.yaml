@@ -1,0 +1,110 @@
+version: 20.07
+
+#
+# Configure an IAG container with a very basic configuration.  This 
+# configuration will simply define a server certificate, and configure an IBM 
+# Security Verify Access system as the identity provider.
+#
+
+#
+# Specify a server certificate to be used by the container.  The server 
+# certificate was created using an openssl command:
+#  openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 \
+#        -out cert.pem
+#
+# To remove the dependency on external files a base-64 representation of the
+# key.pem and cert.pem files can be embedded within this yaml, where the 
+# base-64 encoded file is prefixed with 'B64:', for example: 
+#   "B64:PGhy4KICAgIDxoND5...."
+# 
+# If no certificate is specified a self-signed certificate will be 
+# automatically created and used by the container.
+#
+
+server:
+  ssl:
+    front_end:
+      certificate: "@secret_files/iag.certkey.pem"
+#    applications: 
+#      tlsv11: false
+#      tlsv10: false
+#      tlsv12: true
+
+local_applications:
+  cred_viewer:
+    path_segment: "cred-viewer"
+    enable_html: true
+      
+#
+# Specify an IBM Security Verify Access or IBM Security Access Manager 9.0.7.0+ 
+# system as the identity provider for the container.  Please note that the 
+# values provided below are for illustrative purposes only and don't reflect 
+# a real system.
+#
+# The discovery endpoint is constructed from the IBM Security Verify Access
+# hostname, the junction point and the OIDC definition, and is of the following
+# format:
+#     https://<host>/<junction>/sps/oauth/oauth20/metadata/<oidc definition>
+#
+# The redirect URI which is used in the SSO flow is constructed from the host 
+# header contained in the request, appended with '/pkmsoidc' (for example: 
+# https://ibm-app-gateway.ibm.com/pkmsoidc).  This redirect URI should be
+# specified when creating the custom application within the Security Verify 
+# Access administrators console.
+#
+# The certificate used in this example is the exported CA certificate of the 
+# Security Verify Access system which has been copied to the IAG container
+# in the default configuration location:
+#  /var/iag/config
+
+       
+resource_servers:
+#  - path: "/demo"
+#    connection_type: "ssl"
+#    transparent_path: false
+#    servers:
+#      - host: "sg.isva10.kbs.com"
+#        port: 443
+#        ssl:
+#          certificate: "@secret_files/isva.pem"  
+  - path: "/nodeapp"
+    connection_type: "ssl"
+    transparent_path: false
+    servers:
+      - host: "192.168.42.10"
+        port: 1443
+        ssl:
+          certificate: "@secret_files/nodeapp1.pem"    
+    identity_headers:
+      attributes:
+        - attribute: preferred_username     
+          header: iv-user
+        - attribute: AZN_CRED_NETWORK_ADDRESS_STR
+          header: clientip
+        - attribute: acr
+  - path: "/nodeapp2"
+    connection_type: "tcp"
+    transparent_path: false
+    servers:
+      - host: "192.168.42.10"
+        port: 3000
+    identity_headers:
+      attributes:
+        - attribute: preferred_username     
+          header: iv-user
+        - attribute: AZN_CRED_NETWORK_ADDRESS_STR
+          header: clientip
+        - attribute: acr
+
+identity:
+  # all entries below should be below OIDC 
+  oidc:
+    discovery_endpoint: "https://sg.isva10.kbs.com/mga/sps/oauth/oauth20/metadata/SSOSGWEB/metadata.json"
+    client_id: "48RbfXbU0kAr1yjDqm6J"
+    client_secret: "KsZhwoRl3lqOJOJzYZJN"
+  #mapped_identity: "{sub}"
+  #redirect_uri_host: "127.0.0.1"
+  #response_type: code
+    ssl:
+      certificate: 
+        - "@secret_files/isva.pem"
